@@ -19,4 +19,4 @@ $(TARGET): $(OBJS)
 
 clean:
 	rm -f *.o $(TARGET)
-	rm -f *~
+	rm -f *~ core* out

@@ -5,16 +5,7 @@
 #include <ucontext.h>
 
 #include "coroutine.h"
-
-#define handle_error(msg) \
-	do { perror(msg); exit(EXIT_FAILURE); } while (0)
-
-struct msgbuf {
-	char buf[STACK_SIZE ];
-	int len;
-	int pos;
-	int last;
-};
+#include "utils.h"
 
 static ucontext_t uctx_main;
 
@@ -24,15 +15,16 @@ struct msgbuf *buffer;
 void produce() {
 	while(1) {
 		printf("switch to producer\n");
-		if(buffer->last > 0) { // buffer not empty
+		if(buffer->last > buffer->pos) { // buffer not empty
 			printf("buffer->last > 0, produce but buffer not empty\n");
 			swapcontext(&producer->uctx, &consumer->uctx);
 		}
-		int n = read(0, buffer + buffer->last, buffer->len - buffer->last);
+		int n = read(0, buffer->pos + buffer->last, buffer->len - buffer->last);
 		if(n < 0) {
 			// error
 		} else if (n == 0) { //ctrl + D
 			// switch to uctx_main, then end the process
+			swapcontext(&producer->uctx, &uctx_main);
 		} else {
 			// switch to consumer
 			buffer->last += n;
@@ -80,7 +72,7 @@ int main()
 	if( !consumer)
 		handle_error("create consumer error");
 
-	buffer = (struct msgbuf *)malloc(sizeof(struct msgbuf));
+	buffer = (msgbuf *)malloc(sizeof(struct msgbuf));
 	if( !buffer)
 		handle_error("create msgbuf error");
 	buffer->pos = 0;
@@ -104,5 +96,6 @@ int main()
 	makecontext(&(consumer->uctx), consume, 0);
 
 	swapcontext(&uctx_main, &(producer->uctx));
+	printf("consumer-producer end\n");
 }
 
