@@ -7,7 +7,7 @@ coroutine demo
 
 第一步首先恢复下对ucontext的用法，做一个生产者和消费者的模型，然后再在其中添加一个filter，实现状态转换，没错这是PIL中的lua coroutine的典型用法
 
-第二步将其和网络IO调用结合起来，实现一个较高性能的echo server，然后和epoll模型进行对比；暂时想到这里，begin
+第二步将其和网络IO调用结合起来，实现一个较高性能的echo server，或者压测工具，然后和epoll模型进行对比；暂时想到这里，begin
 
 * 10-15 18:00
 
@@ -19,5 +19,7 @@ coroutine demo
 
 对于接收多链接的echo server，需要有一个单独的线程listen和accept，阻塞式的；如果不使用epoll的话，确保每个协程响应请求的方式只能依靠调度器的快速调度。
 
-如果不用单独线程去accept然后派发的话，每个协程使用SO_REUSEPORT去监听同一端口，也是不错的选择。
+如果使用epoll作为主循环，由事件驱动，与类似nginx的单进程异步处理就没有区别了，协程用在处理事件上恐怕优势不大。
+
+如果不用单独线程去accept然后派发的话，每个协程使用SO_REUSEPORT去监听同一端口，单独作为一个actor，是不错的选择。
 

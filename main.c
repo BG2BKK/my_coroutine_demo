@@ -19,9 +19,11 @@ void produce() {
 			printf("buffer->last > 0, produce but buffer not empty\n");
 			swapcontext(&producer->uctx, &consumer->uctx);
 		}
-		int n = read(0, buffer->pos + buffer->last, buffer->len - buffer->last);
+		int n = read(0, buffer->buf + buffer->last, buffer->len - buffer->last);
 		if(n < 0) {
 			// error
+			printf("producer error for: %s\n", strerror(errno));
+			swapcontext(&producer->uctx, &uctx_main);
 		} else if (n == 0) { //ctrl + D
 			// switch to uctx_main, then end the process
 			swapcontext(&producer->uctx, &uctx_main);
@@ -75,8 +77,9 @@ int main()
 	buffer = (msgbuf *)malloc(sizeof(struct msgbuf));
 	if( !buffer)
 		handle_error("create msgbuf error");
-	buffer->pos = 0;
+	memset(buffer, 0, sizeof(*buffer));
 	buffer->len = sizeof(buffer->buf);
+	buffer->pos = 0;
 	buffer->last = 0;
 
 
