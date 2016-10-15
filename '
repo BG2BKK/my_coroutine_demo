@@ -1,0 +1,20 @@
+
+#include "coroutine.h"
+
+struct coroutine *create_co( cfunc func) {
+	struct coroutine *co = malloc(sizeof(struct coroutine));
+//	if (!co) 
+//		handle_error("coroutine create error\n");
+	co->stack_ = malloc(sizeof(char) * STACK_SIZE);
+	co->uctx.ss_sp = co->stack_;
+	co->uctx.ss_size = STACK_SIZE;
+	co->uc_link = NULL;
+
+	return co;
+}
+
+int free_co( struct coroutine *co) {
+	if(co && co->stack_)
+		free(co->stack_);
+	free(co);
+}
