@@ -51,11 +51,13 @@ pState_trans fsm_transtable[STATE_NUM][SIGNAL_NUM] = {
 };
 
 void trans_action(fsm_t *fsm, FSM_SIGNAL signal, FSM_STATE next) {
-	printf("current state: %d, get signal: %d, switch to state %d\n", fsm->state, signal, next);
+	printf("current state: [%s], ", state_tostr(fsm->state));
+	printf("get signal: <%s>, ", signal_tostr(signal));
+	printf("switch to state [%s]\n", state_tostr(next));
 }
 
 void trans_state_stay(FSM_STATE state, FSM_SIGNAL signal) {
-	printf("current state: %d, get signal: %d, ", state, signal);
+	printf("current state: [%s], get signal: <%d>, ", state_tostr(state), signal);
 	printf("FSM state will not change\n");
 }
 
@@ -71,7 +73,8 @@ void state_tran(fsm_t *fsm, FSM_SIGNAL signal) {
 	} else {
 		trans_state_stay(fsm->state, signal);
 	}
-	swapcontext(&fsm->uctx, &uctx_main );
+	yield(fsm);
+//	swapcontext(&fsm->uctx, &uctx_main );
 }
 
 fsm_t *create_fsm() {
@@ -111,7 +114,7 @@ int main()
 	printf("FSM Start\n");
 
 	while(1) {
-		printf("Please input your signal: ");
+		printf("Please input your signal [0-%d]: ", SIGNAL_NUM-1);
 		int n = scanf("%d", &sig);
 		if(n != 1) {
 			handle_error("input signal error");

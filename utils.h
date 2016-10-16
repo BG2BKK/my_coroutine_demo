@@ -6,7 +6,7 @@
 
 #define BUFFER_SIZE 4096
 #define handle_error(msg) \
-	do { perror(msg); exit(EXIT_FAILURE); } while (0)
+	do { printf("%s\n",msg); exit(1); } while (0)
 
 
 typedef struct msgbuf {
