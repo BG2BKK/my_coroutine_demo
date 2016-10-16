@@ -8,7 +8,7 @@
 #include "coroutine.h"
 #include "utils.h"
 
-static ucontext_t uctx_main, uctx_fsm;
+static ucontext_t uctx_main;
 
 char fsm_stack[STACK_SIZE];
 // char main_stack[STACK_SIZE];
@@ -26,6 +26,12 @@ typedef enum {
 	SIGNAL_C,
 } FSM_SIGNAL;
 
+typedef struct fsm {
+	char stack_[STACK_SIZE];
+	ucontext_t uctx;
+	cfunc func;
+	FSM_STATE state;
+} fsm_t;
 
 void get_signal(FSM_SIGNAL *sig) ;
 
@@ -53,26 +59,17 @@ void stop_fsm() {
 	printf("FSM end\n");
 }
 
+void state_tran(fsm_t *fsm, FSM_SIGNAL signal) {
 
-void state_tran(FSM_SIGNAL signal) {
-
-	static FSM_STATE state = STATE_ENTRY;
+	FSM_STATE state = fsm->state;
 
 	switch(state) {
 		case STATE_ENTRY:
 			switch(signal) {
 				case SIGNAL_A:
 					action_1(state, signal);
-					state = STATE_S1;
-
-					FSM_SIGNAL sig;
-					getcontext(&uctx_main);
-					uctx_main.uc_stack.ss_sp = main_stack;
-					uctx_main.uc_stack.ss_size = STACK_SIZE;
-					uctx_main.uc_link = &uctx_fsm;
-					makecontext(&uctx_main, (void (*)(void))get_signal, 1, &sig);
-
-					swapcontext(&uctx_fsm, &uctx_main);
+					fsm->state = STATE_S1;
+					swapcontext(&fsm->uctx, &uctx_main);
 					break;
 				default:
 					break;
@@ -82,20 +79,13 @@ void state_tran(FSM_SIGNAL signal) {
 			switch(signal) {
 				case SIGNAL_A:
 					action_3(state, signal);
-					state = STATE_DONE;
-
-					getcontext(&uctx_main);
-					uctx_main.uc_stack.ss_sp = main_stack;
-					uctx_main.uc_stack.ss_size = STACK_SIZE;
-					uctx_main.uc_link = NULL;
-					makecontext(&uctx_main, stop_fsm, 0);
-
-					swapcontext(&uctx_fsm, &uctx_main);
+					fsm->state = STATE_DONE;
+					swapcontext(&fsm->uctx, &uctx_main);
 					break;
 				case SIGNAL_B:
 					action_2(state, signal);
-					state = STATE_S2;
-					swapcontext(&uctx_fsm, &uctx_main );
+					fsm->state = STATE_S2;
+					swapcontext(&fsm->uctx, &uctx_main );
 					break;
 				default:
 					break;
@@ -106,12 +96,12 @@ void state_tran(FSM_SIGNAL signal) {
 				case SIGNAL_A:
 					action_0(state, signal);
 					state = STATE_ENTRY;
-					swapcontext(&uctx_fsm, &uctx_main );
+					swapcontext(&fsm->uctx, &uctx_main );
 					break;
 				case SIGNAL_C:
 					action_3(state, signal);
 					state = STATE_DONE;
-					swapcontext(&uctx_fsm, &uctx_main );
+					swapcontext(&fsm->uctx, &uctx_main );
 					break;
 				default:
 					break;
@@ -125,32 +115,53 @@ void state_tran(FSM_SIGNAL signal) {
 	};
 }
 
-void get_signal(FSM_SIGNAL *sig) {
-	printf("Please input your signal: ");
-	int n = scanf("%d", sig);
-	if(n != 1) {
-		handle_error("input signal error");
-	}
-
-	getcontext(&uctx_fsm);
-	uctx_fsm.uc_stack.ss_sp = fsm_stack;
-	uctx_fsm.uc_stack.ss_size = STACK_SIZE;
-	uctx_fsm.uc_link = &uctx_main;
-	makecontext(&uctx_fsm, (void (*)(void))state_tran, 1, *sig);
-
-	swapcontext(&uctx_main, &uctx_fsm);
+fsm_t *create_fsm() {
+	fsm_t *fsm = (fsm_t *) malloc(sizeof(fsm_t));
+	if(!fsm)
+		return NULL;
+	fsm->state = STATE_ENTRY;
+	return fsm;
 }
+
+void yield(fsm_t *fsm) {
+	swapcontext(&fsm->uctx, &uctx_main );
+}
+
+FSM_STATE resume(fsm_t *fsm, FSM_SIGNAL sig) {
+	getcontext(&fsm->uctx);
+	fsm->uctx.uc_stack.ss_sp = fsm->stack_;
+	fsm->uctx.uc_stack.ss_size = STACK_SIZE;
+	fsm->uctx.uc_link = &uctx_main;
+	makecontext(&fsm->uctx, (void (*)(void))state_tran, 2, fsm, sig);
+
+	swapcontext(&uctx_main, &fsm->uctx);
+	return fsm->state;
+}
+
+
 int main()
 {
 	static int sig = 0;
-	printf("FSM begin\n");
+	fsm_t *fsm = create_fsm();
+	if(!fsm) {
+		handle_error("create fsm error\n");
+	}
+	printf("FSM Start\n");
 
-	getcontext(&uctx_main);
-	uctx_main.uc_stack.ss_sp = main_stack;
-	uctx_main.uc_stack.ss_size = STACK_SIZE;
-	uctx_main.uc_link = &uctx_fsm;
-	makecontext(&uctx_main, (void (*)(void))get_signal, 1, &sig);
+	while(1) {
+		printf("Please input your signal: ");
+		int n = scanf("%d", &sig);
+		if(n != 1) {
+			handle_error("input signal error");
+		}
 
-	swapcontext(&uctx_fsm, &uctx_main);
+		FSM_STATE state = resume(fsm, sig);
+		if( state != STATE_DONE) {
+			printf("current state: %d\n", state);
+		} else {
+			printf("current state: %d and FSM stop\n", state);
+			break;
+		}
+	}
 }
 
