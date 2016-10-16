@@ -1,6 +1,6 @@
 CC = gcc
 LD = gcc
-CFLAGS = -Wall -c -O0 -g
+CFLAGS = -c -O0 -g
 LDFLAGS =
 
 SRCS = $(wildcard *.c)

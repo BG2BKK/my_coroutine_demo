@@ -6,111 +6,72 @@
 #include <ucontext.h>
 
 #include "coroutine.h"
+#include "fsm.h"
 #include "utils.h"
 
 static ucontext_t uctx_main;
 
-typedef enum {
-	STATE_ENTRY = 0,
-	STATE_S1,
-	STATE_S2,
-	STATE_DONE,
-} FSM_STATE;
+/*
+ *
+transmission task name: state_xx_signal_yy
+when fsm stay at state xx, then receive signal yy, 
+it will do action and switch to next state
+ */
+STATE_TRANS state_entry_signal_a= { trans_action, STATE_S1}; 
+STATE_TRANS state_s1_signal_a	= { trans_action, STATE_DONE}; 
+STATE_TRANS state_s1_signal_b	= { trans_action, STATE_S2}; 
+STATE_TRANS state_s2_signal_a	= { trans_action, STATE_ENTRY}; 
+STATE_TRANS state_s2_signal_c	= { trans_action, STATE_DONE}; 
 
-typedef enum {
-	SIGNAL_A = 0,
-	SIGNAL_B,
-	SIGNAL_C,
-} FSM_SIGNAL;
+pState_trans fsm_transtable[STATE_NUM][SIGNAL_NUM] = {
 
-typedef struct fsm {
-	char stack_[STACK_SIZE];
-	ucontext_t uctx;
-	cfunc func;
-	FSM_STATE state;
-} fsm_t;
+	{	// STATE_ENTRY
+		&state_entry_signal_a,
+		NULL,
+		NULL,
+	},
 
-void action_1(FSM_STATE state, FSM_SIGNAL signal) {
-	printf("current state: %d, get signal: %d, ", state, signal);
-	printf("switch to STATE_S1\n");
+	{	// STATE_S1
+		&state_s1_signal_a,
+		&state_s1_signal_b,
+		NULL,
+	},
+
+	{	// STATE_S2
+		&state_s2_signal_a,
+		NULL,
+		&state_s2_signal_c,
+	},
+
+	{	// STATE_DONE
+		NULL,
+		NULL,
+		NULL,
+	},
+};
+
+void trans_action(fsm_t *fsm, FSM_SIGNAL signal, FSM_STATE next) {
+	printf("current state: %d, get signal: %d, switch to state %d\n", fsm->state, signal, next);
 }
 
-void action_2(FSM_STATE state, FSM_SIGNAL signal) {
+void trans_state_stay(FSM_STATE state, FSM_SIGNAL signal) {
 	printf("current state: %d, get signal: %d, ", state, signal);
-	printf("swithc to STATE_S2\n");
-}
-
-void action_3(FSM_STATE state, FSM_SIGNAL signal) {
-	printf("current state: %d, get signal: %d, ", state, signal);
-	printf("switch to STATE_DONE and stop FSM\n");
-}
-
-void action_0(FSM_STATE state, FSM_SIGNAL signal) {
-	printf("current state: %d, get signal: %d, ", state, signal);
-	printf("switch to STATE_ENTRY\n");
-}
-
-void action_state_stay(FSM_STATE state, FSM_SIGNAL signal) {
-	printf("current state: %d, get signal: %d, ", state, signal);
-	printf("FSM state not change\n");
+	printf("FSM state will not change\n");
 }
 
 void state_tran(fsm_t *fsm, FSM_SIGNAL signal) {
-
-	FSM_STATE state = fsm->state;
-
-	switch(state) {
-		case STATE_ENTRY:
-			switch(signal) {
-				case SIGNAL_A:
-					action_1(state, signal);
-					fsm->state = STATE_S1;
-					break;
-				default:
-					action_state_stay(state, signal);
-					break;
-			}
-			swapcontext(&fsm->uctx, &uctx_main);
-			break;
-		case STATE_S1:
-			switch(signal) {
-				case SIGNAL_A:
-					action_3(state, signal);
-					fsm->state = STATE_DONE;
-					break;
-				case SIGNAL_B:
-					action_2(state, signal);
-					fsm->state = STATE_S2;
-					break;
-				default:
-					action_state_stay(state, signal);
-					break;
-			}
-			swapcontext(&fsm->uctx, &uctx_main);
-			break;
-		case STATE_S2:
-			switch(signal) {
-				case SIGNAL_A:
-					action_0(state, signal);
-					fsm->state = STATE_ENTRY;
-					break;
-				case SIGNAL_C:
-					action_3(state, signal);
-					fsm->state = STATE_DONE;
-					break;
-				default:
-					action_state_stay(state, signal);
-					break;
-			}
-			swapcontext(&fsm->uctx, &uctx_main );
-			break;
-		case STATE_DONE:
-			printf("state done\n");
-			break;
-		default: 
-			printf("invalid State, stop FSM\n");
-			break;
-	};
+	if(signal >= 0 && signal < SIGNAL_NUM) {
+		pState_trans trans = fsm_transtable[fsm->state][signal];
+		if(trans == NULL) {
+			trans_state_stay(fsm->state, signal);
+		} else {
+			(*(trans->action))(fsm, signal, trans->next);
+			fsm->state = trans->next;
+		}
+	} else {
+		trans_state_stay(fsm->state, signal);
+	}
+	swapcontext(&fsm->uctx, &uctx_main );
 }
 
 fsm_t *create_fsm() {
@@ -157,6 +118,8 @@ int main()
 		}
 
 		FSM_STATE state = resume(fsm, sig);
+
+		printf("================\n");
 		if( state != STATE_DONE) {
 			printf("current state: %d\n", state);
 		} else {
