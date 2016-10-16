@@ -50,13 +50,9 @@ void action_0(FSM_STATE state, FSM_SIGNAL signal) {
 	printf("switch to STATE_ENTRY\n");
 }
 
-void action_stay(FSM_STATE state, FSM_SIGNAL signal) {
+void action_state_stay(FSM_STATE state, FSM_SIGNAL signal) {
 	printf("current state: %d, get signal: %d, ", state, signal);
 	printf("FSM state not change\n");
-}
-
-void stop_fsm() {
-	printf("FSM end\n");
 }
 
 void state_tran(fsm_t *fsm, FSM_SIGNAL signal) {
@@ -71,7 +67,7 @@ void state_tran(fsm_t *fsm, FSM_SIGNAL signal) {
 					fsm->state = STATE_S1;
 					break;
 				default:
-					action_stay(state, signal);
+					action_state_stay(state, signal);
 					break;
 			}
 			swapcontext(&fsm->uctx, &uctx_main);
@@ -87,7 +83,7 @@ void state_tran(fsm_t *fsm, FSM_SIGNAL signal) {
 					fsm->state = STATE_S2;
 					break;
 				default:
-					action_stay(state, signal);
+					action_state_stay(state, signal);
 					break;
 			}
 			swapcontext(&fsm->uctx, &uctx_main);
@@ -103,12 +99,13 @@ void state_tran(fsm_t *fsm, FSM_SIGNAL signal) {
 					fsm->state = STATE_DONE;
 					break;
 				default:
-					action_stay(state, signal);
+					action_state_stay(state, signal);
 					break;
 			}
 			swapcontext(&fsm->uctx, &uctx_main );
 			break;
 		case STATE_DONE:
+			printf("state done\n");
 			break;
 		default: 
 			printf("invalid State, stop FSM\n");
@@ -122,6 +119,10 @@ fsm_t *create_fsm() {
 		return NULL;
 	fsm->state = STATE_ENTRY;
 	return fsm;
+}
+
+void delete_fsm(fsm_t *fsm) {
+	free(fsm);
 }
 
 void yield(fsm_t *fsm) {
@@ -138,7 +139,6 @@ FSM_STATE resume(fsm_t *fsm, FSM_SIGNAL sig) {
 	swapcontext(&uctx_main, &fsm->uctx);
 	return fsm->state;
 }
-
 
 int main()
 {
@@ -164,5 +164,6 @@ int main()
 			break;
 		}
 	}
+	delete_fsm(fsm);
 }
 
