@@ -10,9 +10,6 @@
 
 static ucontext_t uctx_main;
 
-char fsm_stack[STACK_SIZE];
-// char main_stack[STACK_SIZE];
-char *main_stack = fsm_stack;
 typedef enum {
 	STATE_ENTRY = 0,
 	STATE_S1,
@@ -32,8 +29,6 @@ typedef struct fsm {
 	cfunc func;
 	FSM_STATE state;
 } fsm_t;
-
-void get_signal(FSM_SIGNAL *sig) ;
 
 void action_1(FSM_STATE state, FSM_SIGNAL signal) {
 	printf("current state: %d, get signal: %d, ", state, signal);
@@ -55,6 +50,11 @@ void action_0(FSM_STATE state, FSM_SIGNAL signal) {
 	printf("switch to STATE_ENTRY\n");
 }
 
+void action_stay(FSM_STATE state, FSM_SIGNAL signal) {
+	printf("current state: %d, get signal: %d, ", state, signal);
+	printf("FSM state not change\n");
+}
+
 void stop_fsm() {
 	printf("FSM end\n");
 }
@@ -69,43 +69,44 @@ void state_tran(fsm_t *fsm, FSM_SIGNAL signal) {
 				case SIGNAL_A:
 					action_1(state, signal);
 					fsm->state = STATE_S1;
-					swapcontext(&fsm->uctx, &uctx_main);
 					break;
 				default:
+					action_stay(state, signal);
 					break;
 			}
+			swapcontext(&fsm->uctx, &uctx_main);
 			break;
 		case STATE_S1:
 			switch(signal) {
 				case SIGNAL_A:
 					action_3(state, signal);
 					fsm->state = STATE_DONE;
-					swapcontext(&fsm->uctx, &uctx_main);
 					break;
 				case SIGNAL_B:
 					action_2(state, signal);
 					fsm->state = STATE_S2;
-					swapcontext(&fsm->uctx, &uctx_main );
 					break;
 				default:
+					action_stay(state, signal);
 					break;
 			}
+			swapcontext(&fsm->uctx, &uctx_main);
 			break;
 		case STATE_S2:
 			switch(signal) {
 				case SIGNAL_A:
 					action_0(state, signal);
-					state = STATE_ENTRY;
-					swapcontext(&fsm->uctx, &uctx_main );
+					fsm->state = STATE_ENTRY;
 					break;
 				case SIGNAL_C:
 					action_3(state, signal);
-					state = STATE_DONE;
-					swapcontext(&fsm->uctx, &uctx_main );
+					fsm->state = STATE_DONE;
 					break;
 				default:
+					action_stay(state, signal);
 					break;
 			}
+			swapcontext(&fsm->uctx, &uctx_main );
 			break;
 		case STATE_DONE:
 			break;
