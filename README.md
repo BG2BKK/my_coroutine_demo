@@ -5,6 +5,9 @@ coroutine demo
 ```cpp
 
 fsm state transmission procedure:
+	// 执行action
+	// 实现状态跳转
+	// 切换回原执行序列
 
 	fsm_trans_func(sig) {
 		static FSM_STATE state = STATE_ENTRY;
@@ -22,8 +25,10 @@ fsm state transmission procedure:
 
 
 resume procedure:
+	// 接受输入参数，重入fsm
 
 yield procedure
+	// 更新fsm状态后，让出cpu，切回原执行序列
 
 
 main procedure:
