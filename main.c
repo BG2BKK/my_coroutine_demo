@@ -57,7 +57,11 @@ void trans_action(fsm_t *fsm, FSM_SIGNAL signal, FSM_STATE next) {
 }
 
 void trans_state_stay(FSM_STATE state, FSM_SIGNAL signal) {
-	printf("current state: [%s], get signal: <%d>, ", state_tostr(state), signal);
+	printf("current state: [%s], ", state_tostr(state));
+	if(signal >= 0 && signal < SIGNAL_NUM) 
+		printf("get signal: <%s>, ", signal_tostr(signal));
+	else
+		printf("get signal: <%d>, ", signal);
 	printf("FSM state will not change\n");
 }
 
