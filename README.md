@@ -1,5 +1,19 @@
 coroutine demo
 
+* 实现一个简易状态机： STATE_ENTRY, STATE_S1, STATE_S2, STATE_DONE
+
+* 状态切换信号从标准输入读取，信号SIGNAL_A, SIGNAL_B, SIGNAL_C分别是数字0、1、2
+
+* 状态切换表为：
+	* STATE_ENTRY / SIGNAL_A -> STATE_S1
+	* STATE_S1 / SIGNAL_A -> STATE_DONE
+	* STATE_S1 / SIGNAL_B -> STATE_S2
+	* STATE_S2 / SIGNAL_A -> STATE_ENTRY
+	* STATE_S2 / SIGNAL_C -> STATE_DONE
+
+* 除状态切换表内的定义外，FSM接收到其他信号，保持原状，不跳转
+* 跳转到STATE_DONE后，FSM结束
+
 * 使用协程实现有限状态机FSM，伪码设计如下：
 
 ```cpp

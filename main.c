@@ -111,7 +111,7 @@ int main()
 	if(!fsm) {
 		handle_error("create fsm error\n");
 	}
-	printf("FSM Start\n");
+	printf("FSM Start, current state: [%s]\n", state_tostr(fsm->state));
 
 	while(1) {
 		printf("Please input your signal [0-%d]: ", SIGNAL_NUM-1);
