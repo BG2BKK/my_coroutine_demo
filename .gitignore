@@ -4,3 +4,4 @@ out
 core
 *.o
 main
+*.swp
