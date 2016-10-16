@@ -11,8 +11,8 @@
 static ucontext_t uctx_main, uctx_fsm;
 
 char fsm_stack[STACK_SIZE];
-char main_stack[STACK_SIZE];
-
+// char main_stack[STACK_SIZE];
+char *main_stack = fsm_stack;
 typedef enum {
 	STATE_ENTRY = 0,
 	STATE_S1,
@@ -27,7 +27,7 @@ typedef enum {
 } FSM_SIGNAL;
 
 
-void get_signal(int *sig) ;
+void get_signal(FSM_SIGNAL *sig) ;
 
 void action_1(FSM_STATE state, FSM_SIGNAL signal) {
 	printf("current state: %d, get signal: %d, ", state, signal);
@@ -125,7 +125,7 @@ void state_tran(FSM_SIGNAL signal) {
 	};
 }
 
-void get_signal(int *sig) {
+void get_signal(FSM_SIGNAL *sig) {
 	printf("Please input your signal: ");
 	int n = scanf("%d", sig);
 	if(n != 1) {
