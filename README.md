@@ -36,6 +36,9 @@ fsm state transmission procedure:
 				}
 		}
 	}
+	
+
+	// 改为采用跳转表方式更容易维护，也易于使用。已实现
 
 
 resume procedure:
