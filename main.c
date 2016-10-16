@@ -8,98 +8,149 @@
 #include "coroutine.h"
 #include "utils.h"
 
-static ucontext_t uctx_main;
+static ucontext_t uctx_main, uctx_fsm;
 
-struct coroutine *producer, *consumer;
-struct msgbuf *buffer;
+char fsm_stack[STACK_SIZE];
+char main_stack[STACK_SIZE];
 
-void produce() {
-	while(1) {
-		printf("switch to producer\n");
-		if(buffer->last > buffer->pos) { // buffer not empty
-			printf("buffer->last > 0, produce but buffer not empty\n");
-			swapcontext(&producer->uctx, &consumer->uctx);
-		}
-		int n = read(0, buffer->buf + buffer->last, buffer->len - buffer->last);
-		if(n < 0) {
-			// error
-			printf("producer error for: %s\n", strerror(errno));
-			swapcontext(&producer->uctx, &uctx_main);
-		} else if (n == 0) { //ctrl + D
-			// switch to uctx_main, then end the process
-			swapcontext(&producer->uctx, &uctx_main);
-		} else {
-			// switch to consumer
-			buffer->last += n;
-			printf("producer %d bytes\n", n);
-			swapcontext(&producer->uctx, &consumer->uctx);
-		}
-	}
+typedef enum {
+	STATE_ENTRY = 0,
+	STATE_S1,
+	STATE_S2,
+	STATE_DONE,
+} FSM_STATE;
+
+typedef enum {
+	SIGNAL_A = 0,
+	SIGNAL_B,
+	SIGNAL_C,
+} FSM_SIGNAL;
+
+
+void get_signal(int *sig) ;
+
+void action_1(FSM_STATE state, FSM_SIGNAL signal) {
+	printf("current state: %d, get signal: %d, ", state, signal);
+	printf("switch to STATE_S1\n");
 }
 
-void consume() {
-	while(1) {
-		printf("switch to consumer\n");
-		if(buffer->last - buffer->pos > 0) { // not empty
-			int n = write(1, buffer + buffer->pos, buffer->last - buffer->pos);
-			if(n <= 0) {
-				printf("consumer error %s\n", strerror(errno));
-				// error and switch uctx_main, then end the process
-			} else {
-				if (n == buffer->last - buffer->pos) {
-					buffer->pos = buffer->last = 0;
-					swapcontext(&consumer->uctx, &producer->uctx);
-				} else {
-					buffer->pos += n;
-				}
+void action_2(FSM_STATE state, FSM_SIGNAL signal) {
+	printf("current state: %d, get signal: %d, ", state, signal);
+	printf("swithc to STATE_S2\n");
+}
+
+void action_3(FSM_STATE state, FSM_SIGNAL signal) {
+	printf("current state: %d, get signal: %d, ", state, signal);
+	printf("switch to STATE_DONE and stop FSM\n");
+}
+
+void action_0(FSM_STATE state, FSM_SIGNAL signal) {
+	printf("current state: %d, get signal: %d, ", state, signal);
+	printf("switch to STATE_ENTRY\n");
+}
+
+void stop_fsm() {
+	printf("FSM end\n");
+}
+
+
+void state_tran(FSM_SIGNAL signal) {
+
+	static FSM_STATE state = STATE_ENTRY;
+
+	switch(state) {
+		case STATE_ENTRY:
+			switch(signal) {
+				case SIGNAL_A:
+					action_1(state, signal);
+					state = STATE_S1;
+
+					FSM_SIGNAL sig;
+					getcontext(&uctx_main);
+					uctx_main.uc_stack.ss_sp = main_stack;
+					uctx_main.uc_stack.ss_size = STACK_SIZE;
+					uctx_main.uc_link = &uctx_fsm;
+					makecontext(&uctx_main, (void (*)(void))get_signal, 1, &sig);
+
+					swapcontext(&uctx_fsm, &uctx_main);
+					break;
+				default:
+					break;
 			}
-		} else {	// empty
-			printf("consume but empty\n");
-			swapcontext(&consumer->uctx, &producer->uctx);
-		}
-	}
+			break;
+		case STATE_S1:
+			switch(signal) {
+				case SIGNAL_A:
+					action_3(state, signal);
+					state = STATE_DONE;
+
+					getcontext(&uctx_main);
+					uctx_main.uc_stack.ss_sp = main_stack;
+					uctx_main.uc_stack.ss_size = STACK_SIZE;
+					uctx_main.uc_link = NULL;
+					makecontext(&uctx_main, stop_fsm, 0);
+
+					swapcontext(&uctx_fsm, &uctx_main);
+					break;
+				case SIGNAL_B:
+					action_2(state, signal);
+					state = STATE_S2;
+					swapcontext(&uctx_fsm, &uctx_main );
+					break;
+				default:
+					break;
+			}
+			break;
+		case STATE_S2:
+			switch(signal) {
+				case SIGNAL_A:
+					action_0(state, signal);
+					state = STATE_ENTRY;
+					swapcontext(&uctx_fsm, &uctx_main );
+					break;
+				case SIGNAL_C:
+					action_3(state, signal);
+					state = STATE_DONE;
+					swapcontext(&uctx_fsm, &uctx_main );
+					break;
+				default:
+					break;
+			}
+			break;
+		case STATE_DONE:
+			break;
+		default: 
+			printf("invalid State, stop FSM\n");
+			break;
+	};
 }
 
+void get_signal(int *sig) {
+	printf("Please input your signal: ");
+	int n = scanf("%d", sig);
+	if(n != 1) {
+		handle_error("input signal error");
+	}
+
+	getcontext(&uctx_fsm);
+	uctx_fsm.uc_stack.ss_sp = fsm_stack;
+	uctx_fsm.uc_stack.ss_size = STACK_SIZE;
+	uctx_fsm.uc_link = &uctx_main;
+	makecontext(&uctx_fsm, (void (*)(void))state_tran, 1, *sig);
+
+	swapcontext(&uctx_main, &uctx_fsm);
+}
 int main()
 {
-//	producer = create_co(produce, uctx_main);
-//	consumer = create_co(consume, uctx_main);
-//
-//	if( !consumer || !producer)
-//		handle_error("create producer or consumer error");
+	static int sig = 0;
+	printf("FSM begin\n");
 
-	producer = (struct coroutine *)malloc(sizeof(struct coroutine));
-	if( !producer)
-		handle_error("create producer error");
-	consumer = (struct coroutine *)malloc(sizeof(struct coroutine));
-	if( !consumer)
-		handle_error("create consumer error");
+	getcontext(&uctx_main);
+	uctx_main.uc_stack.ss_sp = main_stack;
+	uctx_main.uc_stack.ss_size = STACK_SIZE;
+	uctx_main.uc_link = &uctx_fsm;
+	makecontext(&uctx_main, (void (*)(void))get_signal, 1, &sig);
 
-	buffer = (msgbuf *)malloc(sizeof(struct msgbuf));
-	if( !buffer)
-		handle_error("create msgbuf error");
-	memset(buffer, 0, sizeof(*buffer));
-	buffer->len = sizeof(buffer->buf);
-	buffer->pos = 0;
-	buffer->last = 0;
-
-
-	getcontext(&producer->uctx);
-	producer->uctx.uc_stack.ss_sp = producer->stack_;
-	producer->uctx.uc_stack.ss_size = STACK_SIZE;
-	producer->uctx.uc_link = &consumer->uctx;
-//	producer->uctx.uc_link = &uctx_main;
-
-	getcontext(&consumer->uctx);
-	consumer->uctx.uc_stack.ss_sp = consumer->stack_;
-	consumer->uctx.uc_stack.ss_size = STACK_SIZE;
-	consumer->uctx.uc_link = &producer->uctx;
-//	consumer->uctx.uc_link = &uctx_main;
-
-	makecontext(&(producer->uctx), produce, 0);
-	makecontext(&(consumer->uctx), consume, 0);
-
-	swapcontext(&uctx_main, &(producer->uctx));
-	printf("consumer-producer end\n");
+	swapcontext(&uctx_fsm, &uctx_main);
 }
 
