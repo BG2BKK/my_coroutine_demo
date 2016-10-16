@@ -63,3 +63,5 @@ main procedure:
 	del(fsm);
 
 ```
+
+* 注：fsm分支没有使用coroutine.c和coroutine.h文件
