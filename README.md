@@ -23,3 +23,7 @@ coroutine demo
 
 如果不用单独线程去accept然后派发的话，每个协程使用SO_REUSEPORT去监听同一端口，单独作为一个actor，是不错的选择。
 
+* 10-18
+
+用协程实现一个简易的有限状态机 FSM，在[fsm分支里](https://github.com/BG2BKK/my_coroutine_demo/tree/fsm)
+
